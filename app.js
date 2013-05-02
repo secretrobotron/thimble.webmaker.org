@@ -7,6 +7,7 @@ var ajax = require('request'),
     express = require('express'),
     fs = require('fs'),
     habitat = require('habitat'),
+    localhose = require('localhose'),
     makeAPI = require('./lib/makeapi'),
     mysql = require('mysql'),
     nunjucks = require('nunjucks'),
@@ -31,7 +32,15 @@ app.use(express.logger('dev'));
 app.use(express.compress());
 app.use(express.bodyParser());
 app.use(express.cookieParser());
-app.use(express.cookieSession({secret: env.get('secret')}));
+app.use(express.cookieSession({
+  key: 'wm.sid',
+  secret: "I sometimes feed lunch meat to my neighbour's \"vegan\" dog.",
+  cookie: {
+    maxAge: 2678400000, // 31 days
+    domain: ".webmaker.local"
+  },
+  proxy: true
+}));
 app.use(app.router);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'learning_projects')));
@@ -141,6 +150,13 @@ app.post('/publish',
 );
 
 // run server
+if(localhose) {
+  try {
+    localhose.set("login.webmaker.local", env.get("APP_NAME") + ".webmaker.local");
+    console.log("localhosed domains: ", localhose.domains());
+  }
+  catch(e) { console.error("localhose failed.\nRemember to run this app with sudo, to allow hosts file modification.")}
+}
 app.listen(env.get("PORT"), function(){
   console.log('Express server listening on port ' + env.get("PORT"));
 });
