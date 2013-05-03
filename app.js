@@ -34,7 +34,7 @@ app.use(express.bodyParser());
 app.use(express.cookieParser());
 app.use(express.cookieSession({
   key: 'wm.sid',
-  secret: "I sometimes feed lunch meat to my neighbour's \"vegan\" dog.",
+  secret: env.get("SESSION_SECRET"),
   cookie: {
     maxAge: 2678400000, // 31 days
     domain: ".webmaker.local"
@@ -53,6 +53,8 @@ if (env.get("NODE_ENV") === "development") {
 
 // base dir lookup
 app.get('/', function(req, res) {
+        console.error(req.session);
+
   res.render('index.html', {
     appURL: env.get("HOSTNAME"),
     ssoURL: env.get("HTTP_SSO_URL")
