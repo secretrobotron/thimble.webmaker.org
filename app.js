@@ -54,7 +54,10 @@ if (env.get("NODE_ENV") === "development") {
 
 // base dir lookup
 app.get('/', function(req, res) {
-  res.render('index.html', { appURL: env.get("HOSTNAME") } );
+  res.render('index.html', {
+    appURL: env.get("HOSTNAME"),
+    SSO_HOSTNAME: env.get("SSO_HOSTNAME")
+  });
   console.log("\n\nBeginning\n", req.session, "\n\n", req.cookies);
 });
 
@@ -127,7 +130,8 @@ app.get("/remix/:id/edit", function(req, res) {
   res.render('index.html', {
     appURL: env.get("HOSTNAME"),
     template: content,
-    HTTP_STATIC_URL: '/'
+    HTTP_STATIC_URL: '/',
+    SSO_HOSTNAME: env.get("SSO_HOSTNAME")
   });
 });
 
