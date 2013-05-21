@@ -130,7 +130,7 @@ app.get("/remix/:id/edit", function(req, res) {
   // This is quite ugly, and we need a better way to inject data
   // into friendlycode. I'm pretty sure it CAN load from URI, we
   // just need to find out how to tell it to...
-  var content = req.pageData.replace(/'/g, '\\\'').replace(/\n/g, '\\n');
+  var content = req.pageData.replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/</g,'&lt;');
   res.render('index.html', {
     appURL: env.get("HOSTNAME"),
     template: content,
@@ -151,16 +151,21 @@ app.get("/remix/:id", function(req, res) {
 
 // publish a remix (to the db)
 app.post('/publish',
-         middleware.checkForAuth,
+         // EXPERIMENTAL HACK: ALLOW EVERYTHING FOR WEB COMPONENT DEFINITIONS
+         //middleware.checkForAuth,
          middleware.checkForPublishData,
          middleware.checkForOriginalPage,
-         bleach.bleachData(env.get("BLEACH_ENDPOINT")),
+         //bleach.bleachData(env.get("BLEACH_ENDPOINT")),
+         function(req, res, next) {
+           req.body.sanitizedHTML = req.body.html;
+           next();
+         },
          middleware.saveData(databaseAPI, env.get('HOSTNAME')),
-         middleware.rewritePublishId(databaseAPI),
+         //middleware.rewritePublishId(databaseAPI),
          middleware.finalizeProject(nunjucksEnv, env),
          middleware.publishData(env.get('S3')),
          middleware.rewriteUrl(env.get('USER_SUBDOMAIN')),
-         middleware.publishMake(make),
+         //middleware.publishMake(make),
   function(req, res) {
     res.json({
       'published-url': req.publishedUrl,
