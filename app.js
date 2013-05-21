@@ -162,6 +162,10 @@ app.post('/publish',
          },
          middleware.saveData(databaseAPI, env.get('HOSTNAME')),
          //middleware.rewritePublishId(databaseAPI),
+         function(req, res, next) {
+           req.pageTitle = req.publishId;
+           next();
+         },
          middleware.finalizeProject(nunjucksEnv, env),
          middleware.publishData(env.get('S3')),
          middleware.rewriteUrl(env.get('USER_SUBDOMAIN')),
