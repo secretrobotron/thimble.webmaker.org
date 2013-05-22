@@ -258,7 +258,7 @@
       var content = document.querySelector('.pagecontent-placeholder').value;
       content = content.replace(/\\n/g,"\n").trim();
       return FriendlycodeEditor({
-        allowJS: false,
+        allowJS: true,
         defaultContent: content,
         pageToLoad: '{{pageToLoad}}',
         publisher: Hackpub({
