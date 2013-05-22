@@ -130,7 +130,7 @@ app.get("/remix/:id/edit", function(req, res) {
   // This is quite ugly, and we need a better way to inject data
   // into friendlycode. I'm pretty sure it CAN load from URI, we
   // just need to find out how to tell it to...
-  var content = req.pageData.replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/</g,'&lt;');
+  var content = req.pageData.replace(/'/g, "\\'").replace(/\n/g, '\\n');
   res.render('index.html', {
     appURL: env.get("HOSTNAME"),
     template: content,
@@ -161,7 +161,7 @@ app.post('/publish',
            next();
          },
          middleware.saveData(databaseAPI, env.get('HOSTNAME')),
-         //middleware.rewritePublishId(databaseAPI),
+         middleware.rewritePublishId(databaseAPI),
          function(req, res, next) {
            req.pageTitle = req.publishId;
            next();

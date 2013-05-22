@@ -240,9 +240,9 @@
       };
     });
     </script>
-    <script class='pagecontent-placeholder'>
+    <textarea style="display:none;" class='pagecontent-placeholder'>
       {{ template }}
-    </script>
+    </textarea>
 
     <script>
     /**
@@ -255,9 +255,8 @@
       if (remixedFrom) {
         nav.loadTutorials(remixedFrom);
       }
-      var content = document.querySelector('.pagecontent-placeholder').innerHTML;
-      content = content.replace(/&lt;/g,'<').replace(/\\n/g,"\n").trim();
-      console.log(content);
+      var content = document.querySelector('.pagecontent-placeholder').value;
+      content = content.replace(/\\n/g,"\n").trim();
       return FriendlycodeEditor({
         allowJS: false,
         defaultContent: content,
