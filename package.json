@@ -18,6 +18,7 @@
     "webmaker-loginapi": "0.1.0"
   },
   "optionalDependencies": {
+    "pg": "1.1.1",
     "mysql": "2.0.0-alpha7",
     "sqlite3": "2.1.7"
   },
