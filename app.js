@@ -66,7 +66,9 @@ app.get('/', function(req, res) {
     email: req.session.email || '',
     HTTP_STATIC_URL: '',
     MAKE_ENDPOINT: makeEnv.endpoint,
-    appname: appName
+    appname: appName,
+    openBadgesServer: '',
+    openBadgesToken: ''
   });
 });
 

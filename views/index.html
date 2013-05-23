@@ -32,6 +32,16 @@
             <button id="webmaker-logout">Sign out</button>
           </li>
         </ul>
+        <ul class="webmaker-nav tutorial-nav">
+          <li class="tutorial-list hidden">
+            <a>
+              <div>
+                <span>Tutorial</span>
+                <div class="tutorial-container"></div>
+              </div>
+            </a>
+          </li>
+        </ul>
       </nav>
     </div>
 
@@ -50,8 +60,11 @@
     <script src="{{HTTP_STATIC_URL}}friendlycode/js/require-config.js"></script>
     <script src="{{HTTP_STATIC_URL}}friendlycode/vendor/require.min.js"></script>
     <script src="{{HTTP_STATIC_URL}}js/userbar.js"></script>
-    <script>
 
+    <script>
+    /**
+     * Tutorial listing code, bounds as "webmaker-nav"
+     */
     define("webmaker-nav", ["{{MAKE_ENDPOINT}}/js/make-api.js"], function(Make) {
       var make = Make({
         apiURL: "{{MAKE_ENDPOINT}}"
@@ -129,9 +142,11 @@
         }
       };
     });
+    </script>
 
+    <script>
     /**
-     * ...
+     * Thimble publication hooks
      */
     define("hackpub", ["jquery", "webmaker-nav"], function($, nav) {
       return function Hackpub(options) {
@@ -151,7 +166,6 @@
             });
           },
           saveCode: function(data, originalURL, cb) {
-
             // fake the originalURL for the moment, based on the current doc. URL
             var originalURL = window.location.toString(),
                 iframeDocument = document.querySelector('.preview-holder iframe')
@@ -219,18 +233,38 @@
         };
       };
     });
+    </script>
 
+
+    <!-- openbadges functionality -->
+    <script>
+    var BadgeAPI = false;
+    var giveCredit = function(behavior) {
+      console.log(behavior + " TRIGGERED");
+      if(BadgeAPI) {
+        console.log("CREDITING "+behavior+" AS BADGE");
+        BadgeAPI.credit(behavior)
+      }
+    };
+    </script>
+
+
+    <script>
     /**
-     * ...
+     * Create the actual Thimble code editor components here.
      */
     define("thimblePage",
-           ["jquery", "friendlycode", "hackpub", "webmaker-nav"],
-           function($, FriendlycodeEditor, Hackpub, nav) {
+           ["jquery",
+            "friendlycode",
+            "hackpub",
+            "webmaker-nav",
+            "../../js/html-behaviors"],
+           function($, FriendlycodeEditor, Hackpub, nav, HTMLBehaviors, ClopenBadger) {
       var remixedFrom = "{{REMIXED_FROM}}";
       if (remixedFrom) {
         nav.loadTutorials(remixedFrom);
       }
-      return FriendlycodeEditor({
+      var editor = new FriendlycodeEditor({
         allowJS: false,
         defaultContent: '{{template}}',
         pageToLoad: '{{pageToLoad}}',
@@ -241,33 +275,65 @@
         remixURLTemplate: "{{appURL}}/remix/\{\{VIEW_URL\}\}/edit",
         container: $("#bare-fc-holder")
       });
+
+      // badge crediting
+      editor.ready.done(function() {
+        HTMLBehaviors.attachProbes(editor.codeMirror, giveCredit);
+      });
+      editor.publishUI.on('publish', function(info) {
+        giveCredit('PUBLISHED');
+      });
+
+      return editor;
     });
     </script>
 
-    <script src="{{audience}}/sso/include.js"></script>
 
+    <!--
+      Triggers based on Persona login
+    -->
+    <script src="{{audience}}/sso/include.js"></script>
     <script>
-    /**
-     * ...
-     */
     require([
       "jquery",
-      "thimblePage"
+      "thimblePage",
     ], function($, ThimblePage) {
       var publishButton = $('.publish-button.wm-button.wm-button-blue.short'),
-          myProjects = document.querySelector( ".my-projects-iframe" ),
-          loggedIn = false;
-
+          myProjects = document.querySelector( ".my-projects-iframe" );
       publishButton.hide();
+
+      // ...
+      var ClopenBadger = function() {
+        return {
+          on: function(eventname, fn) {
+            console.log("badgeapi on:"+eventname+" triggered");
+          },
+          credit: function(){}
+        };
+      };
+      // ...
 
       navigator.idSSO.app = {
         onlogin: function(loggedInUser, displayName) {
           publishButton.show();
           userBar.set(loggedInUser);
+          BadgeAPI = ClopenBadger({
+            server: "{{ openBadgesServer }}",
+            token: "{{ openBadgesToken }}",
+            email: loggedInUser
+          });
+          BadgeAPI.on('award', function(badges) {
+            //QALog.log("award", badges);
+          });
+          BadgeAPI.on('change:earnedBadges', function() {
+            //QALog.log("change:earnedBadges", Object.keys(badger.earnedBadges));
+          });
+          giveCredit("LOGGED_IN");
         },
         onlogout: function() {
           publishButton.hide();
           userBar.set("");
+          BadgeAPI = false;
         }
       };
     });
