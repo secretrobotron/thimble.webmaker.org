@@ -53,17 +53,20 @@ if (env.get("NODE_ENV") === "development") {
   app.use(express.errorHandler());
 }
 
+
 // base dir lookup
 app.get('/', function(req, res) {
-  res.render('index.html', {
-    appURL: env.get("HOSTNAME"),
-    template: utils.defaultPage(),
-    audience: env.get("AUDIENCE"),
-    userbar: env.get("USERBAR"),
-    email: req.session.email || '',
-    HTTP_STATIC_URL: '',
-    MAKE_ENDPOINT: makeEnv.endpoint,
-    appname: appName
+  fs.readFile(__dirname + '/views/basic.html', function (err, basicTemplateData) {
+    res.render('index.html', {
+      appURL: env.get("HOSTNAME"),
+      template: basicTemplateData,
+      audience: env.get("AUDIENCE"),
+      userbar: env.get("USERBAR"),
+      email: req.session.email || '',
+      HTTP_STATIC_URL: '',
+      MAKE_ENDPOINT: makeEnv.endpoint,
+      appname: appName
+    });
   });
 });
 

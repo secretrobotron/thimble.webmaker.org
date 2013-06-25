@@ -1,4 +1,3 @@
 [submodule "public/friendlycode"]
 	path = public/friendlycode
 	url = git://github.com/Pomax/friendlycode.git
-
