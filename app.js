@@ -20,7 +20,7 @@ var ajax = require('request'),
     persona = require('express-persona'),
     routes = require('./routes'),
     user = require('./routes/user'),
-    utils = require('./lib/utils');
+    utils = require('./lib/utils'),;
 
 habitat.load();
 
@@ -52,7 +52,6 @@ require('express-persona')(app, { audience: env.get("AUDIENCE") });
 if (env.get("NODE_ENV") === "development") {
   app.use(express.errorHandler());
 }
-
 
 // base dir lookup
 app.get('/', function(req, res) {
