@@ -1,10 +1,41 @@
-.tutorial-list.hidden {
+.tutorial-btn.hidden {
   display: none;
+}
+
+.tutorial-list {
+  background: none repeat scroll 0% 0% rgb(234, 239, 242);
+  margin: 0;
+  padding: 2px;
+  display: none;
+  border: 1px solid #CCC;
+}
+
+.tutorial-list.open {
+  display: inline-block;
+  position: absolute;
+  z-index: 5;
+  right: 178px;
+  margin: 15px;
+}
+
+.tutorial-title {
+  cursor: pointer;
+  margin: 0 0.9em;
+}
+
+.tutorial-arrow {
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 15px solid rgb(234, 239, 242);
+  margin-top: -17px;
+  position: absolute;
+  right: 10px;
 }
 
 .tutorial-container {
   position: absolute;
-  background: rgb(58, 60, 60);
   padding: 0 15px;
   opacity: 0;
   transition: opacity .35s;
@@ -14,15 +45,12 @@
 
 .tutorial-list-item {
   opacity: 0.5;
+  cursor: pointer;
+  padding: 0.5em;
 }
 
 .tutorial-list-item:hover {
   opacity: 1;
-}
-
-.tutorial-list:hover .tutorial-container {
-  opacity: 1;
-  position: relative;
 }
 
 .tutorial-view {
@@ -70,9 +98,10 @@
   top: 7px;
   right: 3px;
   opacity: 0.6;
-  &:hover {
-    opacity: 1;
-  }
+}
+
+.tutorial-close-button:hover {
+  opacity: 1;
 }
 
 .tutorial-iframe {
@@ -103,4 +132,8 @@
   line-height: 14px;
   background-repeat: no-repeat;
   vertical-align: text-top;
+}
+
+.tutorial-nav {
+  float: left;
 }

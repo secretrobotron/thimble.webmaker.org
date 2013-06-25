@@ -4,18 +4,19 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=Edge">
     <meta name="persona-email" content="{{email}}">
+    <meta name="thimble-operation" content="{{pageOperation}}">
+    <meta name="thimble-project-origin" content="{{origin}}">
+    <meta name="X-CSRF-Token" content="{{csrf}}">
     <base target="_blank">
-    <!-- webcomponent enriched, hopefully -->
-
-    <title>Alternate Publisher Friendlycode Editor</title>
+    <title>Mozilla Thimble</title>
     <link rel="stylesheet" href="{{ HTTP_STATIC_URL }}friendlycode/css/friendlycode.css">
     <link rel="stylesheet" href="{{ HTTP_STATIC_URL }}stylesheets/friendlycode-overrides.css">
     <link rel="stylesheet" href="{{ HTTP_STATIC_URL }}stylesheets/userbar-overrides.css">
-    <link rel="stylesheet" href="{{ HTTP_STATIC_URL }}stylesheets/nav.css" />
     <link rel="stylesheet" href="{{ HTTP_STATIC_URL }}stylesheets/tutorial.css" />
-    <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css" />
-    <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
-    <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/smoothness/jquery-ui.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.js"></script>
+    {% include "googleanalytics.html" %}
   </head>
   <body style="margin: 0">
 
@@ -23,39 +24,26 @@
     <link rel="stylesheet" href="{{userbar}}/css/nav.css" />
     <div id="webmaker-nav">
       <nav class="webmaker-nav-container">
-        <ul class="webmaker-nav primary">
-          <li><a>Webmaker</a></li>
-          <li><a class="my-projects-title hidden">My Projects</a></li>
-          <li class="tutorial-list hidden">
-            <a>
-              <div>
-                <span>Tutorial</span>
-                <div class="tutorial-container"></div>
-              </div>
-            </a>
-          </li>
-        </ul>
-        <ul class="webmaker-nav secondary">
-        </ul>
-        <ul class="webmaker-nav custom">
-        </ul>
+        <a id="logo" href="https://webmaker.org"><img src="{{userbar}}/img/webmaker-logo.png" alt="Mozilla Webmaker" /></a>
         <ul class="webmaker-nav user-info">
           <li class="user">
-            <div class="user-name">
-              <span id="identity" class="user-name-container"></span>
-            </div>
+              Hi <span id="identity" class="user-name-container"></span>
           </li>
+          <li class="tutorial-btn hidden"><button>Tutorials</button></li>
+          <li class="makes"><button>My makes</button></li>
           <li>
-            <button id="webmaker-login" class="access-button hidden">Login</button>
-            <button id="webmaker-logout" class="access-button hidden">Logout</button>
+            <iframe src="{{audience}}/sso/include.html" class="include-frame"></iframe>
           </li>
         </ul>
       </nav>
+      <div class="my-projects-container">
+        <iframe class="my-projects-iframe"></iframe>
+      </div>
+      <div class="tutorial-list">
+        <div class="tutorial-arrow"></div>
+      </div>
     </div>
 
-    <div class="my-projects-container">
-      <iframe class="my-projects-iframe" src="{{audience}}/myprojects?app={{appname}}&email={{email}}"></iframe>
-    </div>
     <div class="tutorial-view closed">
       <div class="tutorial-view-title"></div>
       <iframe class="tutorial-iframe"></iframe>
@@ -67,18 +55,16 @@
     <div id="bare-fc-holder" class="friendlycode-loading"></div>
     <script src="{{HTTP_STATIC_URL}}friendlycode/js/require-config.js"></script>
     <script src="{{HTTP_STATIC_URL}}friendlycode/vendor/require.min.js"></script>
-    <script src="{{HTTP_STATIC_URL}}js/userbar.js"></script>
     <script>
-
     define("webmaker-nav", ["{{MAKE_ENDPOINT}}/js/make-api.js"], function(Make) {
       var make = Make({
         apiURL: "{{MAKE_ENDPOINT}}"
       });
       return {
-        loadTutorials: function(remixedFrom) {
-          make.tags("tutorial-" + escape("{{appURL}}/remix/" + remixedFrom)).then(function(err, results) {
-            var tutorialList = $(".tutorial-list"),
-                tutorialContainer = $(".tutorial-container"),
+        loadTutorials: function(publishedUrl) {
+          make.tags("tutorial-" + escape(publishedUrl)).then(function(err, results) {
+            var tutorialBtn = $(".tutorial-btn"),
+                tutorialList = $(".tutorial-list"),
                 iframe = $(".tutorial-iframe"),
                 tutorialView = $(".tutorial-view"),
                 viewTitle = $(".tutorial-view-title"),
@@ -95,7 +81,7 @@
               return;
             }
 
-            tutorialList.removeClass("hidden");
+            tutorialBtn.removeClass("hidden");
 
             var onCoverMouseUp = function() {
               iframeCover.css("display", "none");
@@ -121,7 +107,7 @@
                   "width": ""
                 });
               });
-              tutorialContainer.append(tutorialElement);
+              tutorialList.append(tutorialElement);
             }
 
             tutorialView.mousedown(onCoverMouseDown);
@@ -133,6 +119,10 @@
                 "height": 0,
                 "width": 0
               });
+            });
+
+            tutorialBtn.click(function() {
+              tutorialList.toggleClass("open");
             });
 
             tutorialView.draggable({
@@ -152,6 +142,15 @@
      * ...
      */
     define("hackpub", ["jquery", "webmaker-nav"], function($, nav) {
+
+      // set up CSRF handling
+      var csrf_token = $("meta[name='X-CSRF-Token']").attr("content");
+      $.ajaxSetup({
+        beforeSend: function(request) {
+         request.setRequestHeader('X-CSRF-Token', csrf_token);
+        }
+      });
+
       return function Hackpub(options) {
         return {
           loadCode: function(path, cb) {
@@ -169,10 +168,7 @@
             });
           },
           saveCode: function(data, originalURL, cb) {
-
-            // fake the originalURL for the moment, based on the current doc. URL
-            var originalURL = window.location.toString(),
-                iframeDocument = document.querySelector('.preview-holder iframe')
+            var iframeDocument = document.querySelector('.preview-holder iframe')
                                          .contentDocument,
                 nodeList = Array.prototype.slice.apply(iframeDocument.querySelectorAll('meta')),
                 metaData = {
@@ -187,7 +183,10 @@
                     metaData.author = node.content;
                   },
                   'webmaker:tags': function(node) {
-                    metaData.tags = metaData.tags.concat(node.content.split(","));
+                    var content = node.content.replace(/webmaker:recommended/g, "")
+                                              .replace(/webmaker:featured/g, "")
+                                              .replace(/webmaker:template/g, "");
+                    metaData.tags = metaData.tags.concat(content.split(","));
                   },
                   'webmaker:thumbnail': function(node) {
                     metaData.thumbnail = node.content;
@@ -204,10 +203,6 @@
               metaData.title = iframeDocument.title;
             }
 
-            if(originalURL.indexOf("/edit")!==-1) {
-              originalURL = originalURL.replace('/edit','');
-            } else { originalURL = undefined; }
-
             for (var i = 0; i < nodeList.length; i++) {
               metaName = nodeList[i].name;
               if (metaNames[metaName]) {
@@ -220,17 +215,24 @@
               url: options.hackpubURL + "/publish",
               data: {
                 'html': data,
-                'original-url': originalURL,
-                'metaData': metaData
+                'metaData': metaData,
+                'pageOperation': $("meta[name='thimble-operation']").attr("content"),
+                'origin': $("meta[name='thimble-project-origin']").attr("content")
               },
               dataType: 'json',
               error: function(req) {
                 cb(req);
               },
               success: function(result) {
+                var origin = $("meta[name='thimble-project-origin']").attr("content");
                 cb(null, {path: result['remix-id'], url: result['published-url']});
-                nav.loadTutorials(result['remix-id']);
-                userBar.update();
+                // If we were a remix, update the new page's origin.
+                if ($("meta[name='thimble-operation']").attr("content") === "remix" || !origin) {
+                  origin = result['remix-id'];
+                  $("meta[name='thimble-project-origin']").attr("content",origin);
+                }
+                $("meta[name='thimble-operation']").attr("content","edit");
+                userBar.updateMakes();
               }
             });
           }
@@ -249,21 +251,20 @@
     define("thimblePage",
            ["jquery", "friendlycode", "hackpub", "webmaker-nav"],
            function($, FriendlycodeEditor, Hackpub, nav) {
-      var remixedFrom = "{{REMIXED_FROM}}";
-      if (remixedFrom) {
-        nav.loadTutorials(remixedFrom);
+      var tutorialUrl = "{{tutorialUrl}}";
+      if (tutorialUrl) {
+        nav.loadTutorials(tutorialUrl);
       }
       var content = document.querySelector('.pagecontent-placeholder').value;
       content = content.replace(/\\n/g,"\n").trim();
       return FriendlycodeEditor({
-        allowJS: true,
-        defaultContent: content,
-        pageToLoad: '{{pageToLoad}}',
+        allowJS: false,
+        {{contentType}}: '{{content}}',
         publisher: Hackpub({
           hackpubURL: "{{appURL}}",
-          publishURL: "{{appURL}}/remix",
+          publishURL: "{{appURL}}/project",
         }),
-        remixURLTemplate: "{{appURL}}/remix/\{\{VIEW_URL\}\}/edit",
+        remixURLTemplate: "{{appURL}}/project/\{\{VIEW_URL\}\}/edit",
         container: $("#bare-fc-holder")
       });
     });
@@ -279,8 +280,8 @@
       "jquery",
       "thimblePage"
     ], function($, ThimblePage) {
-      var publishButton = $('.publish-button.wm-button.wm-button-blue.short'),
-          myProjects = document.querySelector( ".my-projects-iframe" ),
+      var publishButton = $('.publish-button'),
+          myProjects = $( ".my-projects-iframe" ),
           loggedIn = false;
 
       publishButton.hide();
@@ -288,11 +289,11 @@
       navigator.idSSO.app = {
         onlogin: function(loggedInUser, displayName) {
           publishButton.show();
-          userBar.set(loggedInUser);
+          myProjects.attr("src", "{{audience}}/me?app={{appname}}");
         },
         onlogout: function() {
           publishButton.hide();
-          userBar.set("");
+          myProjects.attr("src", "");
         }
       };
     });

@@ -13,165 +13,174 @@ var ajax = require('request'),
     express = require('express'),
     fs = require('fs'),
     habitat = require('habitat'),
+    helmet = require( "helmet" ),
     makeAPI = require('./lib/makeapi'),
-    mysql = require('mysql'),
     nunjucks = require('nunjucks'),
     path = require('path'),
     persona = require('express-persona'),
     routes = require('./routes'),
-    user = require('./routes/user'),
-    utils = require('./lib/utils'),;
+    utils = require('./lib/utils');
 
 habitat.load();
 
-var app = express(),
-    appName = "thimble",
+var appName = "thimble",
+    app = express(),
     env = new habitat(),
-    loginAPI = require('webmaker-loginapi')(env.get('LOGINAPI')),
-    makeEnv = env.get("MAKE"),
-    middleware = require( "./lib/middleware")(env),
-    make = makeAPI(makeEnv),
-    nunjucksEnv = new nunjucks.Environment(new nunjucks.FileSystemLoader('views'));
 
-databaseAPI = db(env.get('CLEARDB_DATABASE_URL') || env.get('DB')),
+    /**
+      We're using two databases here: the first is our normal database, the second is
+      a legacy database with old the original thimble.webmaker.org data from 2012/2013
+      prior to the webmaker.org reboot. This database is a read-only database, with
+      remixes/edits being published to the new database instead. This is intended as
+      a short-term solution until all the active "old thimble" projects have been
+      migrated by their owners/remixers.
+    **/
+    databaseAPI = db('thimbleproject', env.get('CLEARDB_DATABASE_URL') || env.get('DB')),
+    legacyDatabaseAPI = db('legacyproject', env.get('LEGACY_DB'), env.get('DB')),
+
+    middleware = require('./lib/middleware')(env),
+    make = makeAPI(env.get('make')),
+    nunjucksEnv = new nunjucks.Environment(new nunjucks.FileSystemLoader('views')),
+    parameters = require('./lib/parameters');
+
 nunjucksEnv.express(app);
+app.locals({
+  GA_ACCOUNT: env.get("GA_ACCOUNT"),
+  GA_DOMAIN: env.get("GA_DOMAIN")
+});
 
-// all environments
+// Express settings
 app.use(express.favicon());
-app.use(express.logger('dev'));
+app.use(express.logger("dev"));
+if (!!env.get("FORCE_SSL") ) {
+  app.use(helmet.hsts());
+  app.enable("trust proxy");
+}
 app.use(express.compress());
 app.use(express.bodyParser());
 app.use(express.cookieParser());
-app.use(express.cookieSession({secret: env.get('SESSION_SECRET')}));
+app.use(express.cookieSession({
+  key: "thimble.sid",
+  secret: env.get("SESSION_SECRET"),
+  cookie: {
+    maxAge: 2678400000, // 31 days. Persona saves session data for 1 month
+    secure: !!env.get("FORCE_SSL")
+  },
+  proxy: true
+}));
+app.use(express.csrf());
+app.use(helmet.xframe());
 app.use(app.router);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'learning_projects')));
-
-// set up persona
-require('express-persona')(app, { audience: env.get("AUDIENCE") });
-if (env.get("NODE_ENV") === "development") {
-  app.use(express.errorHandler());
-}
-
-// base dir lookup
-app.get('/', function(req, res) {
-  fs.readFile(__dirname + '/views/basic.html', function (err, basicTemplateData) {
-    res.render('index.html', {
-      appURL: env.get("HOSTNAME"),
-      template: basicTemplateData,
-      audience: env.get("AUDIENCE"),
-      userbar: env.get("USERBAR"),
-      email: req.session.email || '',
-      HTTP_STATIC_URL: '',
-      MAKE_ENDPOINT: makeEnv.endpoint,
-      appname: appName
-    });
-  });
+app.use(express.static(path.join(__dirname, 'templates')));
+app.use( function( err, req, res, next) {
+  res.send( 500, err );
 });
+
+// what do we do when a project request comes in by id (:id route)?
+app.param('id', parameters.id(databaseAPI));
+
+// what do we do when a project request comes in by id (:oldid route)?
+app.param('oldid', parameters.oldid(legacyDatabaseAPI));
+
+// what do we do when a project request comes in by name (:name route)?
+app.param('name', parameters.name);
+
+// Main page
+app.get('/',
+        middleware.setNewPageOperation,
+        routes.index(utils, env, appName));
+
+// Legacy route for the main page
+app.get('/en-US/editor',
+        middleware.setNewPageOperation,
+        routes.index(utils, env, appName));
+
+// Remix a published page (from db)
+// Even if this is "our own" page, this URL
+// will effect a new page upon publication.
+app.get('/project/:id/remix',
+        middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
+
+// Legacy route for remixing old user content
+app.get('/p/:oldid/remix',
+        middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
+
+// Edit a published page (from db).
+// If this is not "our own" page, this will
+// effect a new page upon publication.
+// Otherwise, the edit overwrites the
+// existing page instead.
+app.get('/project/:id/edit',
+        middleware.setPublishAsUpdate,
+        routes.index(utils, env, appName));
+
+// Legacy route for new premade content
+// See: https://bugzilla.mozilla.org/show_bug.cgi?id=874986
+app.get('/en-US/projects/:name/edit',
+        middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
+
+// Legacy route for old user content
+// see: https://bugzilla.mozilla.org/show_bug.cgi?id=880768
+app.get('/p/:oldid',function(req, res) {
+  res.send(req.pageData);
+});
+
+// Legacy route for editing old user content
+app.get('/p/:oldid/edit',
+        // this will be a remix, since there's no new
+        // data to "edit"; old thimble was anonymous.
+        middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
 
 // learning project listing
 app.get('/projects', function(req, res) {
   fs.readdir('learning_projects', function(err, files){
     if(err) { res.send(404); return; }
-    var projects = [];
-    files.forEach( function(e) {
+    var projects = files.map( function(e) {
       var id = e.replace('.html','');
-      projects.push({
+      return {
         title: id,
-        edit: id,
+        remix: "/projects/" + id + "/",
         view: "/" + id + ".html"
-      });
+      };
     });
     res.render('gallery.html', {location: "projects", title: 'Learning Projects', projects: projects});
   });
 });
 
 // learning project lookup
-app.get('/projects/:name', function(req, res) {
-  res.render('index.html', {
-    appURL: env.get("HOSTNAME"),
-    pageToLoad: '/' + req.params.name + '.html',
-    HTTP_STATIC_URL: '/',
-    appname: appName
-  });
-});
+app.get('/projects/:name',
+        middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
 
-// "my projects" listing -- USED FOR DEV WORK ATM, MAY NOT BE PERMANENT IN ANY WAY
-app.get('/myprojects',
-  middleware.checkForAuth,
-  function(req, res) {
-    make.search({email: req.session.email}, function(err, results) {
-      var projects = [];
-      if (results) {
-        projects = results.map(function(result) {
-          var url = result.url;
-          return {
-            title: result.title || url,
-            edit: url + "/edit",
-            view: url
-          };
-        });
-      }
-      res.render('gallery.html', {title: 'User Projects', projects: projects});
-    });
-  }
-);
-
-// what do we do when a project request comes in by id (:id route)?
-app.param('id', function(req, res, next, id) {
-  databaseAPI.find(id, function(err, result) {
-    if (err) { return next( err ); }
-    if (!result) { return next( new Error("404 Not Found") ); }
-    req.pageData = result.sanitizedData;
-    next();
-  });
-});
-
-// remix a published page (from db)
-app.get("/remix/:id/edit", function(req, res) {
-  // This is quite ugly, and we need a better way to inject data
-  // into friendlycode. I'm pretty sure it CAN load from URI, we
-  // just need to find out how to tell it to...
-  var content = req.pageData.replace(/'/g, "\\'").replace(/\n/g, '\\n');
-  res.render('index.html', {
-    appURL: env.get("HOSTNAME"),
-    template: content,
-    HTTP_STATIC_URL: '/',
-    audience: env.get("AUDIENCE"),
-    userbar: env.get("USERBAR"),
-    email: req.session.email || '',
-    REMIXED_FROM: req.params.id,
-    MAKE_ENDPOINT: makeEnv.endpoint,
-    appname: appName
-  });
-});
-
-// view a published page (from db)
-app.get("/remix/:id", function(req, res) {
-  res.send(req.pageData);
-});
+// project template lookups
+app.get('/templates/:name',
+        middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
 
 // publish a remix (to the db)
 app.post('/publish',
          // EXPERIMENTAL HACK: ALLOW EVERYTHING FOR WEB COMPONENT DEFINITIONS
          //middleware.checkForAuth,
          middleware.checkForPublishData,
-         middleware.checkForOriginalPage,
-         //bleach.bleachData(env.get("BLEACH_ENDPOINT")),
-         function(req, res, next) {
-           req.body.sanitizedHTML = req.body.html;
-           next();
-         },
+         middleware.ensureMetaData,
+         middleware.checkPageOperation(databaseAPI),
+         bleach.bleachData(env.get("BLEACH_ENDPOINT")),
          middleware.saveData(databaseAPI, env.get('HOSTNAME')),
          middleware.rewritePublishId(databaseAPI),
-         //function(req, res, next) {
-         //  req.pageTitle = req.publishId;
-         //  next();
-         //},
+         middleware.generateUrls(appName, env.get('S3'), env.get('USER_SUBDOMAIN')),
          middleware.finalizeProject(nunjucksEnv, env),
          middleware.publishData(env.get('S3')),
-         middleware.rewriteUrl(env.get('USER_SUBDOMAIN')),
-         //middleware.publishMake(make),
+         middleware.rewriteUrl,
+         // update the database now that we have a S3-published URL
+         middleware.saveUrl(databaseAPI, env.get('HOSTNAME')),
+         middleware.getRemixedFrom(databaseAPI, make),
+         middleware.publishMake(make),
   function(req, res) {
     res.json({
       'published-url': req.publishedUrl,
@@ -180,39 +189,9 @@ app.post('/publish',
   }
 );
 
-
-/**
- * WEBMAKER SSO
- */
-persona(app, {
-  audience: env.get( "AUDIENCE" ),
-  verifyResponse: function(err, req, res, email) {
-    if (err) {
-      return res.json({status: "failure", reason: err});
-    }
-    req.session.email = email;
-    res.json({status: "okay", email: email});
-  }
-});
-app.get( "/user/:userid", function( req, res ) {
-  loginAPI.getUser(req.session.email, function(err, user) {
-    if(err || !user) {
-      return res.json({
-        status: "failed",
-        reason: (err || "user not defined")
-      });
-    }
-    req.session.webmakerid = user.subdomain;
-    res.json({
-      status: "okay",
-      user: user
-    });
-  });
-});
-/**
- * END WEBMAKER SSO
- */
-
+// WEBMAKER SSO
+persona(app, {audience: env.get('AUDIENCE')});
+require('webmaker-loginapi')(app, env.get('LOGINAPI'));
 
 // run server
 app.listen(env.get("PORT"), function(){
