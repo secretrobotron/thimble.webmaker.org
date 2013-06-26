@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="/appbuilder/dist/appbuilder.min.js"></script>
+    <script src="/learning_projects/gif-maker/lib/gif.js"></script>
+    <link rel="stylesheet" href="/learning_projects/gif-maker/style.css">
+    <link rel="import" href="/learning_projects/gif-maker/components/shutter.html">
+    <link rel="import" href="/learning_projects/gif-maker/components/button.html">
+  </head>
+  <body>
+    <div id="container" class="no-user-select">
+      <appbuilder-shutter id="shutter">
+        <appbuilder-connection to="#button1" out="isReady" in="enable" />
+      </appbuilder-shutter>
+      <div id="buttons">
+        <appbuilder-button id="button1" name="Shutter Button" class="disabled">Take Picture</appbuilder-button>
+        <appbuilder-button id="button2" name="Gif Button" class="disabled">Create Gif</appbuilder-button>
+        <appbuilder-button id="button3" name="Clear Button" class="disabled">Clear</appbuilder-button>
+      </div>
+      <div id="roll" name="Image Library"></div>
+      <appbuilder-connection from="#button1" to="#shutter" out="click" in="takePicture" />
+      <appbuilder-connection from="#shutter" to="#roll" out="pictureTaken" in="insertPicture" />
+      <appbuilder-connection from="#roll" to="#button2" out="hasPictures" in="enable" />
+    </div>
+    <script src="/learning_projects/gif-maker/js/roll.js"></script>
+  </body>
+</html>

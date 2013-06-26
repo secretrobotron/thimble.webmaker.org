@@ -28,6 +28,7 @@ exports.index = function(utils, env, appName, defaultContentFilePath) {
   }
 
   return function(req, res) {
+    console.log(req, res);
     var content = defaultContent,
         contentType = "defaultContent";
 
@@ -54,7 +55,8 @@ exports.index = function(utils, env, appName, defaultContentFilePath) {
       pageOperation: req.body.pageOperation,
       origin: req.params.id,
       tutorialUrl: req.tutorialUrl,
-      userbar: env.get("USERBAR")
+      userbar: env.get("USERBAR"),
+      allowJS: env.get("ALLOWJS")
     });
   };
 };
