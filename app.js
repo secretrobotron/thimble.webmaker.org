@@ -8,7 +8,7 @@ if ( process.env.NEW_RELIC_ENABLED ) {
  */
 var ajax = require('request'),
     async = require('async'),
-    bleach = require( "./lib/bleach"),
+    // bleach = require( "./lib/bleach"),
     db = require('./lib/database'),
     express = require('express'),
     fs = require('fs'),
@@ -90,7 +90,7 @@ app.param('name', parameters.name);
 // Main page
 app.get('/',
         middleware.setNewPageOperation,
-        routes.index(utils, env, appName));
+        routes.index(utils, env, appName, __dirname + '/views/basic.html'));
 
 // Legacy route for the main page
 app.get('/en-US/editor',
@@ -170,7 +170,7 @@ app.post('/publish',
          middleware.checkForPublishData,
          middleware.ensureMetaData,
          middleware.checkPageOperation(databaseAPI),
-         bleach.bleachData(env.get("BLEACH_ENDPOINT")),
+         //bleach.bleachData(env.get("BLEACH_ENDPOINT")),
          middleware.saveData(databaseAPI, env.get('HOSTNAME')),
          middleware.rewritePublishId(databaseAPI),
          middleware.generateUrls(appName, env.get('S3'), env.get('USER_SUBDOMAIN')),

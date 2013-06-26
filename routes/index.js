@@ -1,10 +1,36 @@
 /**
  * GET for the index.html template
  */
-exports.index = function(utils, env, appName) {
+var fs = require('fs');
+
+exports.index = function(utils, env, appName, defaultContentFilePath) {
+  var defaultContent = '';
+  var alreadyReading = false;
+
+  function readDefaultContentFile () {
+    if (!alreadyReading) {
+      alreadyReading = true;
+      fs.readFile(defaultContentFilePath, 'utf8', function (err, data) {
+        if (!err) {
+          defaultContent = data.replace(/'/g, '\\\'').replace(/\//g, '\\\/').replace(/\n/g, '\\n');
+        }
+        else {
+          console.error(err);
+        }
+        alreadyReading = false;
+      });
+    }
+  }
+
+  if (defaultContentFilePath) {
+    readDefaultContentFile();
+    fs.watchFile(defaultContentFilePath, readDefaultContentFile);
+  }
+
   return function(req, res) {
-    var content = utils.defaultPage(),
+    var content = defaultContent,
         contentType = "defaultContent";
+
     if(req.pageData) {
       content = req.pageData.replace(/'/g, '\\\'').replace(/\n/g, '\\n');
     } else if (req.pageToLoad) {
@@ -14,6 +40,7 @@ exports.index = function(utils, env, appName) {
     if (req.body.pageOperation === "remix") {
       content = content.replace(/<title([^>]*)>/, "<title$1>Remix of ");
     }
+
     res.render('index.html', {
       appname: appName,
       appURL: env.get("HOSTNAME"),
