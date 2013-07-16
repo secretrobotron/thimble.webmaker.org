@@ -109,6 +109,8 @@ app.param('oldid', parameters.oldid(legacyDatabaseAPI));
 // what do we do when a project request comes in by name (:name route)?
 app.param('name', parameters.name);
 
+app.param('html', parameters.html);
+
 // Main page
 app.get('/',
         middleware.setNewPageOperation,
@@ -144,6 +146,10 @@ app.get('/project/:id/edit',
 // See: https://bugzilla.mozilla.org/show_bug.cgi?id=874986
 app.get('/en-US/projects/:name/edit',
         middleware.setDefaultPublishOperation,
+        routes.index(utils, env, appName));
+
+app.get('/html/:html',
+        middleware.setNewPageOperation,
         routes.index(utils, env, appName));
 
 // Legacy route for old user content
